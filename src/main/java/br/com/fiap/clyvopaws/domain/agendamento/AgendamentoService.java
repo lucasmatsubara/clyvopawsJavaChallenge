@@ -87,7 +87,6 @@ public class AgendamentoService {
             agendaDisponivelRepository.save(agendaDisponivel);
         }
 
-        // Finalmente, cria o Agendamento e vincula à Consulta
         Agendamento agendamento = new Agendamento();
         agendamento.setDataHora(request.dataHora());
         agendamento.setTitulo(request.titulo());
@@ -165,6 +164,10 @@ public class AgendamentoService {
 
     @Transactional(readOnly = true)
     public List<AgendamentoResponseDTO> listarPorPet(Long petId) {
+        Pet pet = petRepository.findById(petId)
+                .orElseThrow(() -> new EntityNotFoundException("Pet não encontrado."));
+        authorizationService.assertSelfTutor(pet.getTutor().getId());
+
         return agendamentoRepository.findByConsultaPetId(petId)
                 .stream()
                 .map(this::toResponseDTO)
@@ -173,6 +176,8 @@ public class AgendamentoService {
 
     @Transactional(readOnly = true)
     public List<AgendamentoResponseDTO> listarPorTutor(Long tutorId) {
+        authorizationService.assertSelfTutor(tutorId);
+
         return agendamentoRepository.findByTutorId(tutorId)
                 .stream()
                 .map(this::toResponseDTO)
