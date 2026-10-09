@@ -1,4 +1,5 @@
 target/
 .git/
 .idea/
-application-local.properties
+.vscode/
+src/main/resources/keys/
