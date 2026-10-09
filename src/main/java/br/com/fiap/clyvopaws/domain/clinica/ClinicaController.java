@@ -3,6 +3,7 @@ package br.com.fiap.clyvopaws.domain.clinica;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -26,7 +27,7 @@ public class ClinicaController {
     }
 
     @GetMapping
-    public ResponseEntity<Page<ClinicaResponseDTO>> listarTodas(@PageableDefault(size = 10) Pageable pageable) {
+    public ResponseEntity<Page<ClinicaResponseDTO>> listarTodas(@ParameterObject @PageableDefault(size = 10) Pageable pageable) {
         return ResponseEntity.ok(service.listarTodas(pageable));
     }
 

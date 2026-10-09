@@ -3,6 +3,7 @@ package br.com.fiap.clyvopaws.domain.consulta;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -26,7 +27,7 @@ public class ConsultaController {
     }
 
     @GetMapping
-    public ResponseEntity<Page<ConsultaResponseDTO>> listarTodas(@PageableDefault(size = 10) Pageable pageable) {
+    public ResponseEntity<Page<ConsultaResponseDTO>> listarTodas(@ParameterObject @PageableDefault(size = 10) Pageable pageable) {
         return ResponseEntity.ok(service.listarTodas(pageable));
     }
 
@@ -38,7 +39,7 @@ public class ConsultaController {
     @GetMapping("/pet/{petId}")
     public ResponseEntity<Page<ConsultaResponseDTO>> listarHistorico(
             @PathVariable("petId") Long petId,
-            @org.springdoc.core.annotations.ParameterObject @PageableDefault(size = 5, sort = "dataHora") Pageable pageable) {
+            @ParameterObject @PageableDefault(size = 5, sort = "dataHora") Pageable pageable) {
         return ResponseEntity.ok(service.listarHistoricoPorPet(petId, pageable));
     }
 
@@ -53,5 +54,3 @@ public class ConsultaController {
         return ResponseEntity.noContent().build();
     }
 }
-
-
