@@ -4,7 +4,27 @@ API RESTful desenvolvida para o sistema de gerenciamento veterinário Clyvo Paws
 Este projeto visa digitalizar e otimizar o atendimento clínico, histórico médico
 e acompanhamento preventivo de pets, servindo de backend para o app mobile
 (React Native/Expo) desenvolvido em paralelo pela mesma equipe.
+ 
+--------------------------------------------------------------------------------
+## 🔗 API EM PRODUÇÃO (DEPLOY)
+--------------------------------------------------------------------------------
+A API está publicada no Render e pode ser testada sem instalar nada:
 
+* **Swagger UI:** https://clyvopawsjavachallenge.onrender.com/swagger-ui.html
+  ⚠️ **Primeira requisição lenta:** a hospedagem usa o plano gratuito do Render,
+  que "dorme" o serviço após ~15 minutos sem uso. A primeira chamada depois
+  disso pode levar cerca de 1 minuto para responder. Abra o Swagger e aguarde
+  carregar antes de testar os endpoints.
+
+ℹ️ A raiz da URL (`/`) responde **401** porque não é uma rota pública (toda
+rota fora do Swagger e do login exige token). Use o link do Swagger acima.
+
+**Como testar rapidamente:**
+1. Abra o Swagger e faça `POST /login` com o usuário de teste (ver "Usuários de
+   teste" abaixo).
+2. Copie o `token` da resposta, clique em **Authorize** (cadeado) e cole o
+   token puro (sem escrever "Bearer").
+3. Chame qualquer endpoint pelo "Try it out".
 --------------------------------------------------------------------------------
 ## 👥 INTEGRANTES DO GRUPO (Turma: 2TDSPX)
 --------------------------------------------------------------------------------
@@ -12,7 +32,6 @@ e acompanhamento preventivo de pets, servindo de backend para o app mobile
 * João Pedro Pereira Camilo        | RM: 562005
 * Lucas Matsubara Reis             | RM: 565020
 * Pamella Christiny Chaves Brito   | RM: 565206
-
 --------------------------------------------------------------------------------
 ## 🧱 STACK TÉCNICA
 --------------------------------------------------------------------------------
@@ -25,8 +44,8 @@ e acompanhamento preventivo de pets, servindo de backend para o app mobile
 * **Validação**: Bean Validation (Jakarta Validation / Hibernate Validator)
 * **Documentação**: springdoc-openapi (Swagger UI)
 * **Build**: Maven
+* **Deploy**: Docker (build multi-stage) hospedado no Render
 * **Utilitários**: Lombok
-
 --------------------------------------------------------------------------------
 ## 🚀 ATENDIMENTO AOS REQUISITOS (JAVA ADVANCED)
 --------------------------------------------------------------------------------
@@ -35,50 +54,52 @@ no escopo do Challenge:
 
 ### Spring Security (autenticação e autorização)
 1. Autenticação stateless via JWT, assinado com par de chaves RSA (Spring
-   Security OAuth2 Resource Server + Nimbus JOSE+JWT).
+   Security OAuth2 Resource Server + Nimbus JOSE+JWT). Senhas armazenadas com
+   BCrypt.
 2. Três perfis de usuário com permissões diferentes: TUTOR, VETERINARIO e
    ADMIN — ver tabela completa em "Regras de Autorização" abaixo.
 3. Proteção de rotas por perfil (`hasRole`) **e** por posse do recurso (ex:
    um tutor só acessa/edita os próprios pets, consultas e agendamentos; um
    veterinário só vê/gerencia as próprias consultas), reforçada dentro dos
    Services via `AuthorizationService`.
-
+4. Credenciais do banco e chaves RSA **fora do código-fonte**: usuário e senha
+   do Oracle vêm de variáveis de ambiente (`DB_USERNAME`, `DB_PASSWORD`) e as
+   chaves RSA não são versionadas (`.gitignore`).
 ### Flyway (controle de versão do banco)
-4. Migrations versionadas (`V1`, `V2`, `V3`) com criação de estrutura, carga
+5. Migrations versionadas (`V1`, `V2`, `V3`) com criação de estrutura, carga
    inicial de dados de teste e seed do usuário administrativo.
-
 ### Funcionalidades completas (fluxos além de simples CRUD)
-5. Fluxo de agendamento de consulta: o tutor escolhe pet, clínica, veterinário
+6. Fluxo de agendamento de consulta: o tutor escolhe pet, clínica, veterinário
    e horário; `POST /agendamentos` aceita tanto reaproveitar uma Consulta já
    existente (`consultaId`) quanto criar a Consulta na hora a partir de
-   `petId` + `clinicaId` + `veterinarioId`, checando sobreposição de horário
-   na agenda do veterinário antes de reservar.
-6. Fluxo de acompanhamento de medicação: registro de cada dose tomada pelo
+   `petId` + `clinicaId` + `veterinarioId`, checando a disponibilidade de
+   horário na agenda do veterinário antes de reservar.
+7. Fluxo de acompanhamento de medicação: registro de cada dose tomada pelo
    pet (`POST /medicamentos/doses/check`), com validação de que o registro
    não pode ser feito com data futura.
-
 ### Demais boas práticas
-7. Validação de campos (Bean Validation): implementado via DTOs (`@NotBlank`,
+8. Validação de campos (Bean Validation): implementado via DTOs (`@NotBlank`,
    `@Size` alinhado aos limites reais das colunas no banco, `@Email`,
    `@Pattern` para CPF/CNPJ/CEP, `@Positive`, `@PastOrPresent`, `@Future`),
    incluindo validação em cascata de objetos aninhados (`@Valid`).
-8. Paginação e Ordenação: implementado via `@PageableDefault` nos endpoints
-   de listagem (Tutores, Pets, Veterinários, Consultas, Medicamentos,
-   Agendamentos, Clínicas, Catálogo Preventivo).
-9. Busca com parâmetros: implementado em `GET /planos-preventivos/busca?especie=CACHORRO`.
-10. Uso de Cache: implementado com `@EnableCaching` e `@Cacheable` na Service
-    de CatalogoPreventivo e de Consulta.
-11. Tratamento de Exceções: implementado via `@RestControllerAdvice`
+9. Paginação e Ordenação: implementado via `@PageableDefault` e
+   `@ParameterObject` nos endpoints de listagem (Tutores, Pets, Veterinários,
+   Consultas, Medicamentos, Agendamentos, Clínicas, Catálogo Preventivo).
+10. Busca com parâmetros: implementado em `GET /planos-preventivos/busca?especie=CACHORRO`.
+11. Uso de Cache: implementado com `@EnableCaching`, `@Cacheable` e
+    `@CacheEvict` na Service do Catálogo Preventivo (cache invalidado
+    sempre que um plano é criado, alterado ou excluído).
+12. Tratamento de Exceções: implementado via `@RestControllerAdvice`
     (`GlobalExceptionHandler`), mapeando erros de validação e regra de
-    negócio (400), autenticação/autorização (401/403), recurso não
-    encontrado (404) e parâmetro de ordenação inválido (400), além de um
-    handler genérico para qualquer falha não mapeada (500).
-12. Relacionamentos JPA e DTOs: implementado Data Shaping (Slim Payloads)
+    negócio (400), credenciais inválidas (401), acesso negado (403),
+    recurso não encontrado (404) e parâmetro de ordenação inválido (400),
+    além de um handler genérico para qualquer falha não mapeada (500), que
+    registra o stack trace no log.
+13. Relacionamentos JPA e DTOs: implementado Data Shaping (Slim Payloads)
     para otimizar as consultas evitando loops infinitos, com cascata de
     exclusão configurada corretamente em toda a árvore de relacionamentos
     (Tutor → Pet → Consulta → Medicamento/Agendamento) para evitar erro de
     violação de chave estrangeira ao excluir um registro pai.
-
 --------------------------------------------------------------------------------
 ## 🛡️ REGRAS DE AUTORIZAÇÃO (quem pode fazer o quê)
 --------------------------------------------------------------------------------
@@ -92,13 +113,15 @@ dos Services de domínio:
 | Pet                             | Tutor só cria/vê/edita/exclui os próprios pets; VETERINARIO/ADMIN veem todos |
 | Consulta                        | VETERINARIO só vê/gerencia as consultas em que é o responsável; tutor só vê consultas dos próprios pets (somente leitura); ADMIN acesso total |
 | Medicamento / registro de dose  | Tutor vê e registra dose só nos próprios pets; veterinário só nas consultas em que é responsável; ADMIN acesso total |
-| Agendamento                     | Tutor só cria/vê/edita/exclui agendamentos ligados aos próprios pets |
+| Agendamento                     | Tutor só cria/edita/exclui agendamentos ligados aos próprios pets. Consulta por id ou por consulta: tutor dono, veterinário responsável ou ADMIN. Listagem por pet (`/agendamentos/pet/{id}`) e por tutor (`/agendamentos/tutor/{id}`): só o tutor dono ou ADMIN. Listagem geral: só ADMIN |
 | AgendaDisponivel (horários livres do vet) | Criar/excluir: só o próprio veterinário. Ver horários livres: qualquer autenticado (tutor navegando pra agendar, ou o próprio vet) |
 | Veterinario (perfil)            | Cadastro: só ADMIN. Listagem/detalhe: qualquer autenticado. Editar/excluir: só o próprio vet ou ADMIN |
 | Clinica / CatalogoPreventivo    | Leitura: qualquer autenticado. Escrita (POST/PUT/DELETE): só ADMIN |
 
-Tentativas fora dessas regras retornam **403 Forbidden**.
-
+Sem token ou com credenciais inválidas a API responde **401**; tentativas
+fora dessas regras (token válido, mas sem permissão sobre o recurso)
+retornam **403 Forbidden**.
+ 
 --------------------------------------------------------------------------------
 ## 🌐 PRINCIPAIS ENDPOINTS
 --------------------------------------------------------------------------------
@@ -118,39 +141,83 @@ abaixo). Resumo dos grupos de rotas:
 | Agenda do veterinário | `POST /agendas` (só o próprio vet), `GET /agendas/veterinario/{veterinarioId}`, `DELETE /agendas/{id}` |
 | Catálogo preventivo | `GET /planos-preventivos`, `GET /planos-preventivos/busca?especie=CACHORRO`, `POST/PUT/DELETE /planos-preventivos/{id}` (só ADMIN) |
 
+💡 **Dica de uso nos endpoints paginados:** o Swagger mostra `page`, `size` e
+`sort` como campos separados. Deixe `sort` **vazio** para usar a ordenação
+padrão, ou informe um campo real da entidade (ex: `dataHora,DESC`). Um campo
+inexistente (como o texto `string`) retorna **400** com mensagem explicativa.
+ 
 --------------------------------------------------------------------------------
 ## ⚠️ LIMITAÇÕES CONHECIDAS
 --------------------------------------------------------------------------------
 * `PUT /tutores/{id}` (via `TutorUpdateDTO`) atualiza nome, e-mail, CPF,
-  telefone e foto, mas **não atualiza o endereço** do tutor. Essa decisão foi 
-  implementada pois na aplicação é solicitado do tutor que dê permissão de sua localização atual.
+  telefone e foto, mas **não atualiza o endereço** do tutor. Essa decisão foi
+  tomada porque, na aplicação mobile, a localização é solicitada ao tutor
+  diretamente pelo app (com a permissão do usuário).
 * Ao alterar o e-mail de um tutor, o `username` de login (`tb_user`) é
   sincronizado automaticamente — mas o token JWT já emitido continua válido
   com o e-mail **antigo** como identidade até expirar. Depois de trocar o
   e-mail, é necessário fazer login novamente para obter um token atualizado.
 * Somente o login de **TUTOR** devolve o próprio perfil (`nomeCompleto`,
   `fotoUrl`, `id`) direto na resposta de `POST /login`. Um VETERINARIO ou
-  ADMIN autenticado recebe só o `token`; ainda não há endpoint dedicado pra esses
-  perfis descobrirem o próprio ID depois do login.
+  ADMIN autenticado recebe só o `token`; ainda não há endpoint dedicado para
+  esses perfis descobrirem o próprio ID depois do login.
+* Veterinários não têm acesso às rotas `GET /agendamentos/pet/{id}` e
+  `GET /agendamentos/tutor/{id}` (restritas ao tutor dono e ao ADMIN); eles
+  consultam seus agendamentos por consulta (`GET /agendamentos/consulta/{id}`).
+* Na hospedagem gratuita, o serviço dorme após inatividade (ver seção
+  "API em Produção").
+--------------------------------------------------------------------------------
+## ☁️ DEPLOY (RENDER + DOCKER)
+--------------------------------------------------------------------------------
+A aplicação é publicada no Render como **Web Service com Docker**, usando o
+`Dockerfile` da raiz (build multi-stage: Maven + JDK 21 para compilar,
+imagem JRE 21 para executar). O banco continua sendo o Oracle da FIAP.
 
+Nada sensível fica no repositório. A configuração de produção é feita no
+painel do Render (aba **Environment**):
 
+| Variável | Valor |
+|---|---|
+| `DB_USERNAME` | usuário do Oracle |
+| `DB_PASSWORD` | senha do Oracle |
+| `RSA_PRIVATE_KEY` | `file:/etc/secrets/private_key.pem` |
+| `RSA_PUBLIC_KEY` | `file:/etc/secrets/public_key.pem` |
+| `JAVA_TOOL_OPTIONS` | `-Xmx384m` (limita a memória da JVM no plano gratuito) |
+
+E, em **Secret Files**, dois arquivos com o conteúdo das chaves RSA de
+produção: `private_key.pem` e `public_key.pem` (montados em `/etc/secrets/`).
+
+O `application.properties` lê tudo isso por placeholders
+(`${DB_USERNAME}`, `${DB_PASSWORD}`, `${PORT:8080}`) e as propriedades
+`rsa.private-key` / `rsa.public-key` são sobrescritas pelas variáveis
+`RSA_PRIVATE_KEY` / `RSA_PUBLIC_KEY`. O Render define a porta pela variável
+`PORT`, e `server.forward-headers-strategy=framework` faz o Swagger gerar
+links `https` corretos atrás do proxy.
+ 
 --------------------------------------------------------------------------------
 ## ⚙️ COMO EXECUTAR O PROJETO LOCALMENTE (PASSO A PASSO)
 --------------------------------------------------------------------------------
+> Para apenas testar a API, use a versão publicada (seção "API em Produção").
+> Rodar localmente só é necessário para desenvolvimento.
 
 ### Pré-requisitos
 * JDK 21
-* Maven (ou use o `mvnw`/`mvnw.cmd` incluso no projeto)
-* Acesso a um banco Oracle (ex: o Oracle da FIAP)
-* OpenSSL (pra gerar as chaves RSA — já vem instalado em Linux/Mac; no
-  Windows, costuma vir junto com o Git Bash, ou pode instalar separado)
-
-### Passo 1 — Clonar e configurar o banco
+* Maven
+* Acesso a um banco Oracle (ex: o Oracle da FIAP) — usuário e senha
+* OpenSSL (para gerar as chaves RSA — já vem instalado em Linux/Mac; no
+  Windows costuma vir junto com o Git Bash)
+### Passo 1 — Clonar e informar as credenciais do banco
 1. Clone o repositório e abra na sua IDE.
-2. Em `src/main/resources/application.properties`, configure `spring.datasource.url`,
-   `spring.datasource.username` e `spring.datasource.password` com suas
-   credenciais Oracle.
-
+2. As credenciais **não ficam no código**. Defina as variáveis de ambiente
+   antes de subir a aplicação:
+    * `DB_USERNAME` — usuário do Oracle
+    * `DB_PASSWORD` — senha do Oracle
+    * (opcional) `DB_URL` — URL JDBC; se omitida, usa a do Oracle da FIAP
+      (`jdbc:oracle:thin:@oracle.fiap.com.br:1521:ORCL`)
+      No IntelliJ: *Run → Edit Configurations → Environment variables* →
+      `DB_USERNAME=seu_usuario;DB_PASSWORD=sua_senha`.
+      No terminal (Linux/Mac): `export DB_USERNAME=... DB_PASSWORD=...`.
+      No Windows (cmd): `set DB_USERNAME=...` e `set DB_PASSWORD=...`.
 ### Passo 2 — Gerar o par de chaves RSA (obrigatório)
 A API usa JWT assinado com RSA. As chaves NÃO ficam versionadas no Git
 (`.gitignore`) — cada máquina/clone precisa gerar o próprio par antes do
@@ -185,6 +252,8 @@ endpoints, com um botão verde "Authorize" no topo da página.
 * Tutores/Veterinários: `<username do seed, ex. tutor1@email.com>` / `Senha@123`
 * Admin (único perfil que pode cadastrar veterinário via `POST /veterinarios`):
   `admin@clyvopaws.com` / `Admin@123`
+  ⚠️ No login, informe a **senha em texto** (ex: `Admin@123`), nunca o hash
+  bcrypt que aparece nas migrations.
 
 --------------------------------------------------------------------------------
 ## 🔑 AUTENTICAÇÃO: COMO USAR O TOKEN JWT
@@ -203,7 +272,8 @@ traz:
 um **TUTOR** (é o próprio ID do tutor, útil pra montar as demais chamadas
 como `GET /pets/tutor/{tutorId}` sem precisar de outra requisição). Pra
 VETERINARIO/ADMIN, esses campos vêm nulos ou com o `username` no lugar do
-nome — só o `token` é garantido pra qualquer perfil.
+nome — só o `token` é garantido pra qualquer perfil. O token expira em 30
+minutos; credenciais inválidas retornam **401**.
 
 O token vai no header `Authorization: Bearer <token>` em toda rota protegida.
 
@@ -213,26 +283,27 @@ O token vai no header `Authorization: Bearer <token>` em toda rota protegida.
 3. Cole o token puro no campo `bearerAuth` (sem o prefixo "Bearer", o Swagger
    adiciona sozinho) e clique em "Authorize".
 4. Toda chamada feita pelo "Try it out" a partir daí já sai autenticada.
-
-**No Postman:**
+   **No Postman:**
 1. Faça o `POST /login` numa requisição normal e copie o `token` da resposta.
 2. Na requisição que quer autenticar, aba "Authorization" → Type "Bearer Token"
    → cole o token puro no campo "Token".
 3. (Opcional) Automatize com uma variável de collection: no `POST /login`, aba
    "Tests", adicione `pm.collectionVariables.set('token', pm.response.json().token);`
    e use `{{token}}` como Bearer Token nas demais requisições.
-
 --------------------------------------------------------------------------------
 ## 📱 CONECTANDO COM O APP MOBILE (React Native / Expo Go)
 --------------------------------------------------------------------------------
+Com a API publicada, o app pode apontar direto para a URL do Render
+(`https://clyvopawsjavachallenge.onrender.com`), sem depender de IP local.
+
 O CORS (`CorsConfig.java`) está liberado para `http://localhost:8081` nos
 métodos GET/POST/PUT/DELETE/PATCH/OPTIONS. Isso só importa se o app for
 testado via **Expo Web** (navegador) — testando via **Expo Go** nativo
 (celular físico ou emulador), CORS não se aplica, então não é preciso mexer
 nisso.
 
-Testando via **Expo Go num celular físico**, na mesma rede Wi-Fi do PC onde
-a API roda:
+Para testar contra a API rodando **localmente** via **Expo Go num celular
+físico**, na mesma rede Wi-Fi do PC onde a API roda:
 
 1. `localhost` no celular aponta pro próprio celular, não pro PC. No código
    do app RN, use o IP local do PC (Windows: `ipconfig` → endereço IPv4 do
@@ -244,12 +315,10 @@ a API roda:
    `http://<IP-DO-PC>:8080/swagger-ui.html` no navegador do próprio celular.
    Se abrir, a rede está OK e qualquer erro daí em diante é no app, não na
    conexão.
-
-Testando via **emulador Android**: use `http://10.0.2.2:8080` (alias
-especial que o emulador usa pra apontar pro `localhost` do host).
+   Testando via **emulador Android**: use `http://10.0.2.2:8080` (alias
+   especial que o emulador usa pra apontar pro `localhost` do host).
 
 Testando via **Expo Web** (`expo start --web`): ajuste `CorsConfig.java`
 se a porta do dev server do Expo Web não for `8081`, ou adicione mais de
 uma origem permitida.
-
---------------------------------------------------------------------------------
+ 
