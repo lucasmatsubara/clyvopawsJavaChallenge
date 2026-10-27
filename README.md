@@ -4,17 +4,18 @@ API RESTful desenvolvida para o sistema de gerenciamento veterinário Clyvo Paws
 Este projeto visa digitalizar e otimizar o atendimento clínico, histórico médico
 e acompanhamento preventivo de pets, servindo de backend para o app mobile
 (React Native/Expo) desenvolvido em paralelo pela mesma equipe.
- 
+
 --------------------------------------------------------------------------------
 ## 🔗 API EM PRODUÇÃO (DEPLOY)
 --------------------------------------------------------------------------------
 A API está publicada no Render e pode ser testada sem instalar nada:
 
 * **Swagger UI:** https://clyvopawsjavachallenge.onrender.com/swagger-ui.html
-  ⚠️ **Primeira requisição lenta:** a hospedagem usa o plano gratuito do Render,
-  que "dorme" o serviço após ~15 minutos sem uso. A primeira chamada depois
-  disso pode levar cerca de 1 minuto para responder. Abra o Swagger e aguarde
-  carregar antes de testar os endpoints.
+
+⚠️ **Primeira requisição lenta:** a hospedagem usa o plano gratuito do Render,
+que "dorme" o serviço após ~15 minutos sem uso. A primeira chamada depois
+disso pode levar cerca de 1 minuto para responder. Abra o Swagger e aguarde
+carregar antes de testar os endpoints.
 
 ℹ️ A raiz da URL (`/`) responde **401** porque não é uma rota pública (toda
 rota fora do Swagger e do login exige token). Use o link do Swagger acima.
@@ -25,6 +26,7 @@ rota fora do Swagger e do login exige token). Use o link do Swagger acima.
 2. Copie o `token` da resposta, clique em **Authorize** (cadeado) e cole o
    token puro (sem escrever "Bearer").
 3. Chame qualquer endpoint pelo "Try it out".
+
 --------------------------------------------------------------------------------
 ## 👥 INTEGRANTES DO GRUPO (Turma: 2TDSPX)
 --------------------------------------------------------------------------------
@@ -32,6 +34,7 @@ rota fora do Swagger e do login exige token). Use o link do Swagger acima.
 * João Pedro Pereira Camilo        | RM: 562005
 * Lucas Matsubara Reis             | RM: 565020
 * Pamella Christiny Chaves Brito   | RM: 565206
+
 --------------------------------------------------------------------------------
 ## 🧱 STACK TÉCNICA
 --------------------------------------------------------------------------------
@@ -44,8 +47,11 @@ rota fora do Swagger e do login exige token). Use o link do Swagger acima.
 * **Validação**: Bean Validation (Jakarta Validation / Hibernate Validator)
 * **Documentação**: springdoc-openapi (Swagger UI)
 * **Build**: Maven
+* **Integração com IA**: serviço Python externo consumido via `RestClient`
+  (Spring 6.1), com autenticação por chave de API interna
 * **Deploy**: Docker (build multi-stage) hospedado no Render
 * **Utilitários**: Lombok
+
 --------------------------------------------------------------------------------
 ## 🚀 ATENDIMENTO AOS REQUISITOS (JAVA ADVANCED)
 --------------------------------------------------------------------------------
@@ -65,9 +71,11 @@ no escopo do Challenge:
 4. Credenciais do banco e chaves RSA **fora do código-fonte**: usuário e senha
    do Oracle vêm de variáveis de ambiente (`DB_USERNAME`, `DB_PASSWORD`) e as
    chaves RSA não são versionadas (`.gitignore`).
+
 ### Flyway (controle de versão do banco)
 5. Migrations versionadas (`V1`, `V2`, `V3`) com criação de estrutura, carga
    inicial de dados de teste e seed do usuário administrativo.
+
 ### Funcionalidades completas (fluxos além de simples CRUD)
 6. Fluxo de agendamento de consulta: o tutor escolhe pet, clínica, veterinário
    e horário; `POST /agendamentos` aceita tanto reaproveitar uma Consulta já
@@ -77,29 +85,37 @@ no escopo do Challenge:
 7. Fluxo de acompanhamento de medicação: registro de cada dose tomada pelo
    pet (`POST /medicamentos/doses/check`), com validação de que o registro
    não pode ser feito com data futura.
+
+8. Integração com serviço de IA: `POST /api/ia/analisar-pet` recebe a foto do
+   pet (multipart) e a encaminha ao serviço Python de análise, devolvendo
+   espécie, raça provável e nível de confiança para o tutor **confirmar**
+   (ver seção "Integração com IA" abaixo).
+
 ### Demais boas práticas
-8. Validação de campos (Bean Validation): implementado via DTOs (`@NotBlank`,
+9. Validação de campos (Bean Validation): implementado via DTOs (`@NotBlank`,
    `@Size` alinhado aos limites reais das colunas no banco, `@Email`,
    `@Pattern` para CPF/CNPJ/CEP, `@Positive`, `@PastOrPresent`, `@Future`),
    incluindo validação em cascata de objetos aninhados (`@Valid`).
-9. Paginação e Ordenação: implementado via `@PageableDefault` e
-   `@ParameterObject` nos endpoints de listagem (Tutores, Pets, Veterinários,
-   Consultas, Medicamentos, Agendamentos, Clínicas, Catálogo Preventivo).
-10. Busca com parâmetros: implementado em `GET /planos-preventivos/busca?especie=CACHORRO`.
-11. Uso de Cache: implementado com `@EnableCaching`, `@Cacheable` e
+10. Paginação e Ordenação: implementado via `@PageableDefault` e
+    `@ParameterObject` nos endpoints de listagem (Tutores, Pets, Veterinários,
+    Consultas, Medicamentos, Agendamentos, Clínicas, Catálogo Preventivo).
+11. Busca com parâmetros: implementado em `GET /planos-preventivos/busca?especie=CACHORRO`.
+12. Uso de Cache: implementado com `@EnableCaching`, `@Cacheable` e
     `@CacheEvict` na Service do Catálogo Preventivo (cache invalidado
     sempre que um plano é criado, alterado ou excluído).
-12. Tratamento de Exceções: implementado via `@RestControllerAdvice`
+13. Tratamento de Exceções: implementado via `@RestControllerAdvice`
     (`GlobalExceptionHandler`), mapeando erros de validação e regra de
     negócio (400), credenciais inválidas (401), acesso negado (403),
-    recurso não encontrado (404) e parâmetro de ordenação inválido (400),
+    recurso não encontrado (404), parâmetro de ordenação inválido (400),
+    arquivo acima do limite (413) e falhas do serviço de IA (502/503/504),
     além de um handler genérico para qualquer falha não mapeada (500), que
     registra o stack trace no log.
-13. Relacionamentos JPA e DTOs: implementado Data Shaping (Slim Payloads)
+14. Relacionamentos JPA e DTOs: implementado Data Shaping (Slim Payloads)
     para otimizar as consultas evitando loops infinitos, com cascata de
     exclusão configurada corretamente em toda a árvore de relacionamentos
     (Tutor → Pet → Consulta → Medicamento/Agendamento) para evitar erro de
     violação de chave estrangeira ao excluir um registro pai.
+
 --------------------------------------------------------------------------------
 ## 🛡️ REGRAS DE AUTORIZAÇÃO (quem pode fazer o quê)
 --------------------------------------------------------------------------------
@@ -117,11 +133,12 @@ dos Services de domínio:
 | AgendaDisponivel (horários livres do vet) | Criar/excluir: só o próprio veterinário. Ver horários livres: qualquer autenticado (tutor navegando pra agendar, ou o próprio vet) |
 | Veterinario (perfil)            | Cadastro: só ADMIN. Listagem/detalhe: qualquer autenticado. Editar/excluir: só o próprio vet ou ADMIN |
 | Clinica / CatalogoPreventivo    | Leitura: qualquer autenticado. Escrita (POST/PUT/DELETE): só ADMIN |
+| Análise de foto por IA          | Somente TUTOR e ADMIN (`@PreAuthorize`) |
 
 Sem token ou com credenciais inválidas a API responde **401**; tentativas
 fora dessas regras (token válido, mas sem permissão sobre o recurso)
 retornam **403 Forbidden**.
- 
+
 --------------------------------------------------------------------------------
 ## 🌐 PRINCIPAIS ENDPOINTS
 --------------------------------------------------------------------------------
@@ -139,13 +156,62 @@ abaixo). Resumo dos grupos de rotas:
 | Medicamentos | `POST /medicamentos`, `GET/PUT/DELETE /medicamentos/{id}`, `GET /medicamentos/consulta/{consultaId}`, `POST /medicamentos/doses/check`, `GET /medicamentos` |
 | Agendamentos | `POST /agendamentos` (com ou sem `consultaId` — sem ele, cria a consulta na hora), `GET/PUT/DELETE /agendamentos/{id}`, `GET /agendamentos/consulta/{consultaId}`, `GET /agendamentos/pet/{petId}`, `GET /agendamentos/tutor/{tutorId}` |
 | Agenda do veterinário | `POST /agendas` (só o próprio vet), `GET /agendas/veterinario/{veterinarioId}`, `DELETE /agendas/{id}` |
+| IA | `POST /api/ia/analisar-pet` (multipart, campo `foto`; só TUTOR e ADMIN; JPEG/PNG/WebP até 5 MB) |
 | Catálogo preventivo | `GET /planos-preventivos`, `GET /planos-preventivos/busca?especie=CACHORRO`, `POST/PUT/DELETE /planos-preventivos/{id}` (só ADMIN) |
 
 💡 **Dica de uso nos endpoints paginados:** o Swagger mostra `page`, `size` e
 `sort` como campos separados. Deixe `sort` **vazio** para usar a ordenação
 padrão, ou informe um campo real da entidade (ex: `dataHora,DESC`). Um campo
 inexistente (como o texto `string`) retorna **400** com mensagem explicativa.
- 
+
+--------------------------------------------------------------------------------
+## 🤖 INTEGRAÇÃO COM IA (ANÁLISE DE FOTO DO PET)
+--------------------------------------------------------------------------------
+O endpoint `POST /api/ia/analisar-pet` permite que o tutor envie uma foto do
+pet e receba uma **sugestão** de espécie e raça. A API Java não faz a análise:
+ela valida a foto, autentica a chamada e a encaminha a um serviço Python
+separado (também hospedado no Render), que devolve o resultado.
+
+**Requisição:** `multipart/form-data`, campo `foto`, header
+`Authorization: Bearer <token>` (perfil TUTOR ou ADMIN).
+
+**Regras da foto:** JPEG, PNG ou WebP, até 5 MB. Fora disso a API responde
+415 (formato) ou 413 (tamanho) antes mesmo de chamar a IA.
+
+**Resposta 200 (exemplo):**
+```json
+{
+  "status": "ok",
+  "especie": "CACHORRO",
+  "racaProvavel": "Labrador",
+  "confiancaVisual": "media",
+  "caracteristicas": ["pelagem curta", "porte grande"],
+  "motivo": "...",
+  "idAnalise": "...",
+  "modelo": "...",
+  "requerConfirmacaoTutor": true,
+  "aviso": "..."
+}
+```
+O resultado é apenas uma sugestão: `requerConfirmacaoTutor` é sempre `true` e o
+app deve pedir que o tutor confirme ou corrija antes de salvar o pet. Se o
+serviço de IA devolver outra coisa, a API responde 502.
+
+**Erros possíveis:**
+
+| Código | Quando |
+|---|---|
+| 400 | Foto ausente (campo `foto` não enviado), vazia ou ilegível |
+| 413 | Foto maior que 5 MB |
+| 415 | Formato diferente de JPEG, PNG ou WebP |
+| 502 | Resposta inválida do serviço de IA |
+| 503 | Chave `IA_SERVICE_API_KEY` não configurada/incorreta, serviço de IA fora do ar ou sem cota |
+| 504 | O serviço de IA demorou mais de 60 segundos |
+
+**Comunicação entre os serviços:** o Java chama o Python com o header
+`X-API-Key`. A URL e a chave vêm de variáveis de ambiente (`IA_BASE_URL` e
+`IA_SERVICE_API_KEY`) e **nunca** ficam no repositório.
+
 --------------------------------------------------------------------------------
 ## ⚠️ LIMITAÇÕES CONHECIDAS
 --------------------------------------------------------------------------------
@@ -164,8 +230,12 @@ inexistente (como o texto `string`) retorna **400** com mensagem explicativa.
 * Veterinários não têm acesso às rotas `GET /agendamentos/pet/{id}` e
   `GET /agendamentos/tutor/{id}` (restritas ao tutor dono e ao ADMIN); eles
   consultam seus agendamentos por consulta (`GET /agendamentos/consulta/{id}`).
+* O serviço de IA também roda no plano gratuito e dorme após inatividade: a
+  primeira análise depois de um tempo parado pode retornar 504. Basta repetir
+  a chamada (ou abrir a URL do serviço de IA antes para acordá-lo).
 * Na hospedagem gratuita, o serviço dorme após inatividade (ver seção
   "API em Produção").
+
 --------------------------------------------------------------------------------
 ## ☁️ DEPLOY (RENDER + DOCKER)
 --------------------------------------------------------------------------------
@@ -182,6 +252,8 @@ painel do Render (aba **Environment**):
 | `DB_PASSWORD` | senha do Oracle |
 | `RSA_PRIVATE_KEY` | `file:/etc/secrets/private_key.pem` |
 | `RSA_PUBLIC_KEY` | `file:/etc/secrets/public_key.pem` |
+| `IA_BASE_URL` | URL do serviço de IA (Python), ex: `https://clyvopaws-ia.onrender.com` |
+| `IA_SERVICE_API_KEY` | chave interna Java → serviço de IA (mínimo 32 caracteres; deve ser a mesma configurada no serviço Python) |
 | `JAVA_TOOL_OPTIONS` | `-Xmx384m` (limita a memória da JVM no plano gratuito) |
 
 E, em **Secret Files**, dois arquivos com o conteúdo das chaves RSA de
@@ -193,7 +265,7 @@ O `application.properties` lê tudo isso por placeholders
 `RSA_PRIVATE_KEY` / `RSA_PUBLIC_KEY`. O Render define a porta pela variável
 `PORT`, e `server.forward-headers-strategy=framework` faz o Swagger gerar
 links `https` corretos atrás do proxy.
- 
+
 --------------------------------------------------------------------------------
 ## ⚙️ COMO EXECUTAR O PROJETO LOCALMENTE (PASSO A PASSO)
 --------------------------------------------------------------------------------
@@ -206,6 +278,7 @@ links `https` corretos atrás do proxy.
 * Acesso a um banco Oracle (ex: o Oracle da FIAP) — usuário e senha
 * OpenSSL (para gerar as chaves RSA — já vem instalado em Linux/Mac; no
   Windows costuma vir junto com o Git Bash)
+
 ### Passo 1 — Clonar e informar as credenciais do banco
 1. Clone o repositório e abra na sua IDE.
 2. As credenciais **não ficam no código**. Defina as variáveis de ambiente
@@ -214,10 +287,16 @@ links `https` corretos atrás do proxy.
     * `DB_PASSWORD` — senha do Oracle
     * (opcional) `DB_URL` — URL JDBC; se omitida, usa a do Oracle da FIAP
       (`jdbc:oracle:thin:@oracle.fiap.com.br:1521:ORCL`)
-      No IntelliJ: *Run → Edit Configurations → Environment variables* →
-      `DB_USERNAME=seu_usuario;DB_PASSWORD=sua_senha`.
-      No terminal (Linux/Mac): `export DB_USERNAME=... DB_PASSWORD=...`.
-      No Windows (cmd): `set DB_USERNAME=...` e `set DB_PASSWORD=...`.
+    * (opcional) `IA_BASE_URL` e `IA_SERVICE_API_KEY` — só necessárias para
+      usar `POST /api/ia/analisar-pet`. Sem elas o restante da API funciona
+      normalmente e esse endpoint responde 503. Por padrão `IA_BASE_URL`
+      aponta para `http://127.0.0.1:8000`.
+
+   No IntelliJ: *Run → Edit Configurations → Environment variables* →
+   `DB_USERNAME=seu_usuario;DB_PASSWORD=sua_senha`.
+   No terminal (Linux/Mac): `export DB_USERNAME=... DB_PASSWORD=...`.
+   No Windows (cmd): `set DB_USERNAME=...` e `set DB_PASSWORD=...`.
+
 ### Passo 2 — Gerar o par de chaves RSA (obrigatório)
 A API usa JWT assinado com RSA. As chaves NÃO ficam versionadas no Git
 (`.gitignore`) — cada máquina/clone precisa gerar o próprio par antes do
@@ -252,8 +331,9 @@ endpoints, com um botão verde "Authorize" no topo da página.
 * Tutores/Veterinários: `<username do seed, ex. tutor1@email.com>` / `Senha@123`
 * Admin (único perfil que pode cadastrar veterinário via `POST /veterinarios`):
   `admin@clyvopaws.com` / `Admin@123`
-  ⚠️ No login, informe a **senha em texto** (ex: `Admin@123`), nunca o hash
-  bcrypt que aparece nas migrations.
+
+⚠️ No login, informe a **senha em texto** (ex: `Admin@123`), nunca o hash
+bcrypt que aparece nas migrations.
 
 --------------------------------------------------------------------------------
 ## 🔑 AUTENTICAÇÃO: COMO USAR O TOKEN JWT
@@ -283,13 +363,15 @@ O token vai no header `Authorization: Bearer <token>` em toda rota protegida.
 3. Cole o token puro no campo `bearerAuth` (sem o prefixo "Bearer", o Swagger
    adiciona sozinho) e clique em "Authorize".
 4. Toda chamada feita pelo "Try it out" a partir daí já sai autenticada.
-   **No Postman:**
+
+**No Postman:**
 1. Faça o `POST /login` numa requisição normal e copie o `token` da resposta.
 2. Na requisição que quer autenticar, aba "Authorization" → Type "Bearer Token"
    → cole o token puro no campo "Token".
 3. (Opcional) Automatize com uma variável de collection: no `POST /login`, aba
    "Tests", adicione `pm.collectionVariables.set('token', pm.response.json().token);`
    e use `{{token}}` como Bearer Token nas demais requisições.
+
 --------------------------------------------------------------------------------
 ## 📱 CONECTANDO COM O APP MOBILE (React Native / Expo Go)
 --------------------------------------------------------------------------------
@@ -315,10 +397,10 @@ físico**, na mesma rede Wi-Fi do PC onde a API roda:
    `http://<IP-DO-PC>:8080/swagger-ui.html` no navegador do próprio celular.
    Se abrir, a rede está OK e qualquer erro daí em diante é no app, não na
    conexão.
-   Testando via **emulador Android**: use `http://10.0.2.2:8080` (alias
-   especial que o emulador usa pra apontar pro `localhost` do host).
+
+Testando via **emulador Android**: use `http://10.0.2.2:8080` (alias
+especial que o emulador usa pra apontar pro `localhost` do host).
 
 Testando via **Expo Web** (`expo start --web`): ajuste `CorsConfig.java`
 se a porta do dev server do Expo Web não for `8081`, ou adicione mais de
 uma origem permitida.
- 
