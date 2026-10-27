@@ -1,6 +1,9 @@
 package br.com.fiap.clyvopaws.auth;
 
 import br.com.fiap.clyvopaws.domain.tutor.TutorRepository;
+import br.com.fiap.clyvopaws.domain.user.User;
+import br.com.fiap.clyvopaws.domain.user.UserRepository;
+import br.com.fiap.clyvopaws.domain.veterinario.VeterinarioRepository;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -17,10 +20,12 @@ public class AuthController {
 
     private final AuthenticationManager authenticationManager;
     private final TokenService tokenService;
+    private final UserRepository userRepository;
     private final TutorRepository tutorRepository;
+    private final VeterinarioRepository veterinarioRepository;
 
     public record LoginRequest(String username, String password) {}
-    public record LoginResponse(String token, String nomeCompleto, String fotoUrl, Long id) {}
+    public record LoginResponse(String token, String nomeCompleto, String fotoUrl, Long id, String role) {}
 
     @PostMapping("/login")
     public LoginResponse login(@RequestBody LoginRequest request){
@@ -31,14 +36,32 @@ public class AuthController {
                 )
         );
 
-        String token = tokenService.generateToken(auth.getName());
+        String username = auth.getName();
+        String token = tokenService.generateToken(username);
+        String role = userRepository.findByUsername(username).map(User::getRole).orElse(null);
 
-        var tutor = tutorRepository.findByUserUsername(auth.getName()).orElse(null);
-        String nome = (tutor != null) ? tutor.getNomeCompleto() : auth.getName();
-        String foto = (tutor != null) ? tutor.getFotoUrl() : null;
-        Long tutorId = (tutor != null) ? tutor.getId() : null;
+        // Perfis sem registro próprio (ADMIN) ficam com o username como nome e id/foto nulos.
+        String nome = username;
+        String foto = null;
+        Long id = null;
 
-        return new LoginResponse(token, nome, foto, tutorId);
+        if ("TUTOR".equals(role)) {
+            var tutor = tutorRepository.findByUserUsername(username).orElse(null);
+            if (tutor != null) {
+                nome = tutor.getNomeCompleto();
+                foto = tutor.getFotoUrl();
+                id = tutor.getId();
+            }
+        } else if ("VETERINARIO".equals(role)) {
+            var vet = veterinarioRepository.findByUserUsername(username).orElse(null);
+            if (vet != null) {
+                nome = vet.getNomeCompleto();
+                foto = vet.getFotoUrl();
+                id = vet.getId();
+            }
+        }
+
+        return new LoginResponse(token, nome, foto, id, role);
     }
 
 }
