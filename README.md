@@ -223,10 +223,11 @@ serviço de IA devolver outra coisa, a API responde 502.
   sincronizado automaticamente — mas o token JWT já emitido continua válido
   com o e-mail **antigo** como identidade até expirar. Depois de trocar o
   e-mail, é necessário fazer login novamente para obter um token atualizado.
-* Somente o login de **TUTOR** devolve o próprio perfil (`nomeCompleto`,
-  `fotoUrl`, `id`) direto na resposta de `POST /login`. Um VETERINARIO ou
-  ADMIN autenticado recebe só o `token`; ainda não há endpoint dedicado para
-  esses perfis descobrirem o próprio ID depois do login.
+* O **ADMIN** não possui um registro de perfil próprio (não é tutor nem
+  veterinário), então no `POST /login` ele recebe `id` e `fotoUrl` nulos e o
+  `username` no lugar do `nomeCompleto`. Não existe endpoint dedicado para
+  consultar o próprio perfil depois do login: o app deve guardar o que
+  recebeu na resposta do login.
 * Veterinários não têm acesso às rotas `GET /agendamentos/pet/{id}` e
   `GET /agendamentos/tutor/{id}` (restritas ao tutor dono e ao ADMIN); eles
   consultam seus agendamentos por consulta (`GET /agendamentos/consulta/{id}`).
@@ -345,15 +346,20 @@ traz:
   "token": "eyJhbGciOiJSUzI1NiJ9...",
   "nomeCompleto": "Ana Souza",
   "fotoUrl": "https://...",
-  "id": 3
+  "id": 3,
+  "role": "TUTOR"
 }
 ```
-`nomeCompleto`, `fotoUrl` e `id` só vêm preenchidos quando quem faz login é
-um **TUTOR** (é o próprio ID do tutor, útil pra montar as demais chamadas
-como `GET /pets/tutor/{tutorId}` sem precisar de outra requisição). Pra
-VETERINARIO/ADMIN, esses campos vêm nulos ou com o `username` no lugar do
-nome — só o `token` é garantido pra qualquer perfil. O token expira em 30
-minutos; credenciais inválidas retornam **401**.
+* `role`: perfil do usuário (`TUTOR`, `VETERINARIO` ou `ADMIN`) — o app usa
+  para decidir quais telas mostrar.
+* `nomeCompleto`, `fotoUrl` e `id`: dados do **perfil** do usuário. O `id` é
+  o ID do próprio tutor (útil para chamadas como `GET /pets/tutor/{tutorId}`)
+  ou do próprio veterinário (útil para `GET /agendas/veterinario/{id}`),
+  conforme o `role`. Tudo vem da resposta do login, sem requisição extra.
+* **ADMIN** não tem perfil próprio: recebe `id` e `fotoUrl` nulos e o
+  `username` no lugar do `nomeCompleto`.
+
+O token expira em 30 minutos; credenciais inválidas retornam **401**.
 
 O token vai no header `Authorization: Bearer <token>` em toda rota protegida.
 
