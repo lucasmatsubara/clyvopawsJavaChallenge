@@ -11,6 +11,9 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -29,6 +32,51 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(erro);
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErroPadrao> tratarResponseStatus(ResponseStatusException e, HttpServletRequest request) {
+        int codigo = e.getStatusCode().value();
+        HttpStatus status = HttpStatus.resolve(codigo);
+        String titulo = (status != null) ? status.getReasonPhrase() : "Erro";
+        String mensagem = (e.getReason() != null) ? e.getReason() : titulo;
+
+        if (codigo >= 500) {
+            log.warn("Falha em {}: {}", request.getRequestURI(), mensagem);
+        }
+
+        ErroPadrao erro = new ErroPadrao(
+                LocalDateTime.now(),
+                codigo,
+                titulo,
+                mensagem,
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(e.getStatusCode()).body(erro);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErroPadrao> tratarUploadGrande(MaxUploadSizeExceededException e, HttpServletRequest request) {
+        ErroPadrao erro = new ErroPadrao(
+                LocalDateTime.now(),
+                HttpStatus.PAYLOAD_TOO_LARGE.value(),
+                "Arquivo Muito Grande",
+                "A foto excede o tamanho máximo permitido (5 MB).",
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(erro);
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ErroPadrao> tratarParteAusente(MissingServletRequestPartException e, HttpServletRequest request) {
+        ErroPadrao erro = new ErroPadrao(
+                LocalDateTime.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                "Requisição Inválida",
+                "Envie o arquivo no campo '" + e.getRequestPartName() + "'.",
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(erro);
     }
 
     @ExceptionHandler(PropertyReferenceException.class)
