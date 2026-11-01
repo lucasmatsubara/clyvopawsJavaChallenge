@@ -118,14 +118,7 @@ public class TutorService {
     }
 
     private TutorResponseDTO toResponseDTO(Tutor tutor) {
-        return new TutorResponseDTO(
-                tutor.getId(),
-                tutor.getNomeCompleto(),
-                tutor.getCpf(),
-                tutor.getTelefone(),
-                tutor.getEmail(),
-                tutor.getFotoUrl()
-        );
+        return new TutorResponseDTO(tutor);
     }
 
 

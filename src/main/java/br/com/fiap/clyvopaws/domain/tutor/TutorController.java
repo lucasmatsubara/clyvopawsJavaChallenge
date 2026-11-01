@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -20,7 +21,7 @@ import java.net.URI;
 public class TutorController {
     private final TutorService tutorService;
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<TutorResponseDTO> cadastrar(@Valid @RequestBody TutorRequestDTO request) {
         TutorResponseDTO response = tutorService.cadastrar(request);
         URI uri = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(response.id()).toUri();
@@ -38,7 +39,7 @@ public class TutorController {
         return ResponseEntity.ok(tutorService.listarTodos(pageable));
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<TutorResponseDTO> atualizar(@PathVariable Long id, @Valid @RequestBody TutorUpdateDTO dto) {
         return ResponseEntity.ok(tutorService.atualizar(id, dto));
     }

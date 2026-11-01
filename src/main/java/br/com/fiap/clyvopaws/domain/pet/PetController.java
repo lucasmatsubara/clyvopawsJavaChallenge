@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -21,7 +22,7 @@ import java.util.List;
 public class PetController {
     private final PetService petService;
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<PetResponseDTO> cadastrar(@Valid @RequestBody PetRequestDTO request) {
         PetResponseDTO response = petService.cadastrar(request);
         URI uri = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(response.id()).toUri();
@@ -44,7 +45,7 @@ public class PetController {
         return ResponseEntity.ok(petService.listarTodosPaginado(pageable));
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<PetResponseDTO> atualizar(@PathVariable("id") Long id, @Valid @RequestBody PetRequestDTO request) {
         return ResponseEntity.ok(petService.atualizar(id, request));
     }
