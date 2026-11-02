@@ -5,7 +5,8 @@ public record VeterinarioResponseDTO(
         String nomeCompleto,
         String crmv,
         String email,
-        String clinicaNome
+        String clinicaNome,
+        String fotoUrl
 ) {
     public VeterinarioResponseDTO(Veterinario vet) {
         this(
@@ -13,7 +14,8 @@ public record VeterinarioResponseDTO(
                 vet.getNomeCompleto(),
                 vet.getCrmv(),
                 vet.getEmail(),
-                vet.getClinica() != null ? vet.getClinica().getNome() : null
+                vet.getClinica() != null ? vet.getClinica().getNome() : null,
+                vet.getFotoUrl()
         );
     }
 }
