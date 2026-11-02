@@ -28,6 +28,11 @@ rota fora do Swagger e do login exige token). Use o link do Swagger acima.
 3. Chame qualquer endpoint pelo "Try it out".
 
 --------------------------------------------------------------------------------
+## 🎥 VÍDEO DE APRESENTAÇÃO
+--------------------------------------------------------------------------------
+* **Link do vídeo (até 15 minutos):** _COLE_O_LINK_AQUI_
+
+--------------------------------------------------------------------------------
 ## 👥 INTEGRANTES DO GRUPO (Turma: 2TDSPX)
 --------------------------------------------------------------------------------
 * Felipe Ribeiro Salles de Camargo | RM: 565224
@@ -40,10 +45,11 @@ rota fora do Swagger e do login exige token). Use o link do Swagger acima.
 --------------------------------------------------------------------------------
 * **Linguagem**: Java 21
 * **Framework**: Spring Boot 3.2.6
-* **Persistência**: Spring Data JPA + Hibernate, banco Oracle
+* **Persistência**: Spring Data JPA + Hibernate, banco Oracle (fotos em `BLOB`
+  e sessões de login acessadas via `JdbcTemplate`)
 * **Migrations**: Flyway (`flyway-core` + `flyway-database-oracle`)
 * **Segurança**: Spring Security + OAuth2 Resource Server, JWT assinado com
-  par de chaves RSA (Nimbus JOSE+JWT)
+  par de chaves RSA (Nimbus JOSE+JWT), com refresh token rotativo
 * **Validação**: Bean Validation (Jakarta Validation / Hibernate Validator)
 * **Documentação**: springdoc-openapi (Swagger UI)
 * **Build**: Maven
@@ -73,8 +79,11 @@ no escopo do Challenge:
    chaves RSA não são versionadas (`.gitignore`).
 
 ### Flyway (controle de versão do banco)
-5. Migrations versionadas (`V1`, `V2`, `V3`) com criação de estrutura, carga
-   inicial de dados de teste e seed do usuário administrativo.
+5. Migrations versionadas (`V1` a `V5`): criação da estrutura, carga inicial
+   de dados de teste, seed do usuário administrativo (`V1`–`V3`), tabela de
+   fotos em BLOB (`V4`) e tabelas de sessão/refresh token (`V5`). Migrations
+   já aplicadas nunca são editadas; toda mudança de banco entra em uma nova
+   versão.
 
 ### Funcionalidades completas (fluxos além de simples CRUD)
 6. Fluxo de agendamento de consulta: o tutor escolhe pet, clínica, veterinário
@@ -91,26 +100,33 @@ no escopo do Challenge:
    espécie, raça provável e nível de confiança para o tutor **confirmar**
    (ver seção "Integração com IA" abaixo).
 
+9. Fotos de tutores e pets armazenadas no próprio Oracle (`BLOB`): o cadastro
+   e a atualização aceitam `multipart/form-data` com os dados e a foto, e a
+   imagem é servida por `GET /fotos/{id}` (ver seção "Fotos" abaixo).
+10. Sessão com refresh token: o JWT de acesso é curto (15 minutos) e a renovação
+    é feita por `POST /auth/refresh`, com rotação do token e revogação da
+    sessão em caso de reutilização (ver seção "Autenticação" abaixo).
+
 ### Demais boas práticas
-9. Validação de campos (Bean Validation): implementado via DTOs (`@NotBlank`,
-   `@Size` alinhado aos limites reais das colunas no banco, `@Email`,
-   `@Pattern` para CPF/CNPJ/CEP, `@Positive`, `@PastOrPresent`, `@Future`),
-   incluindo validação em cascata de objetos aninhados (`@Valid`).
-10. Paginação e Ordenação: implementado via `@PageableDefault` e
+11. Validação de campos (Bean Validation): implementado via DTOs (`@NotBlank`,
+    `@Size` alinhado aos limites reais das colunas no banco, `@Email`,
+    `@Pattern` para CPF/CNPJ/CEP, `@Positive`, `@PastOrPresent`, `@Future`),
+    incluindo validação em cascata de objetos aninhados (`@Valid`).
+12. Paginação e Ordenação: implementado via `@PageableDefault` e
     `@ParameterObject` nos endpoints de listagem (Tutores, Pets, Veterinários,
     Consultas, Medicamentos, Agendamentos, Clínicas, Catálogo Preventivo).
-11. Busca com parâmetros: implementado em `GET /planos-preventivos/busca?especie=CACHORRO`.
-12. Uso de Cache: implementado com `@EnableCaching`, `@Cacheable` e
+13. Busca com parâmetros: implementado em `GET /planos-preventivos/busca?especie=CACHORRO`.
+14. Uso de Cache: implementado com `@EnableCaching`, `@Cacheable` e
     `@CacheEvict` na Service do Catálogo Preventivo (cache invalidado
     sempre que um plano é criado, alterado ou excluído).
-13. Tratamento de Exceções: implementado via `@RestControllerAdvice`
+15. Tratamento de Exceções: implementado via `@RestControllerAdvice`
     (`GlobalExceptionHandler`), mapeando erros de validação e regra de
     negócio (400), credenciais inválidas (401), acesso negado (403),
     recurso não encontrado (404), parâmetro de ordenação inválido (400),
     arquivo acima do limite (413) e falhas do serviço de IA (502/503/504),
     além de um handler genérico para qualquer falha não mapeada (500), que
     registra o stack trace no log.
-14. Relacionamentos JPA e DTOs: implementado Data Shaping (Slim Payloads)
+16. Relacionamentos JPA e DTOs: implementado Data Shaping (Slim Payloads)
     para otimizar as consultas evitando loops infinitos, com cascata de
     exclusão configurada corretamente em toda a árvore de relacionamentos
     (Tutor → Pet → Consulta → Medicamento/Agendamento) para evitar erro de
@@ -134,6 +150,8 @@ dos Services de domínio:
 | Veterinario (perfil)            | Cadastro: só ADMIN. Listagem/detalhe: qualquer autenticado. Editar/excluir: só o próprio vet ou ADMIN |
 | Clinica / CatalogoPreventivo    | Leitura: qualquer autenticado. Escrita (POST/PUT/DELETE): só ADMIN |
 | Análise de foto por IA          | Somente TUTOR e ADMIN (`@PreAuthorize`) |
+| Foto de tutor / pet (upload)    | Mesmas regras do cadastro: só o próprio tutor altera a foto dele e dos próprios pets |
+| Leitura da foto (`GET /fotos/{id}`) | Pública: o identificador é um UUID aleatório e não existe listagem de fotos |
 
 Sem token ou com credenciais inválidas a API responde **401**; tentativas
 fora dessas regras (token válido, mas sem permissão sobre o recurso)
@@ -147,9 +165,10 @@ abaixo). Resumo dos grupos de rotas:
 
 | Grupo | Endpoints principais |
 |---|---|
-| Autenticação | `POST /login` |
-| Tutores | `POST /tutores` (público), `GET/PUT/DELETE /tutores/{id}`, `GET /tutores` |
-| Pets | `POST /pets`, `GET/PUT/DELETE /pets/{id}`, `GET /pets/tutor/{tutorId}`, `GET /pets` |
+| Autenticação | `POST /login`, `POST /auth/refresh`, `POST /auth/logout` (todas públicas) |
+| Tutores | `POST /tutores` (público), `GET/PUT/DELETE /tutores/{id}`, `GET /tutores` — `POST` e `PUT` aceitam JSON **ou** multipart com foto |
+| Pets | `POST /pets`, `GET/PUT/DELETE /pets/{id}`, `GET /pets/tutor/{tutorId}`, `GET /pets` — `POST` e `PUT` aceitam JSON **ou** multipart com foto |
+| Fotos | `GET /fotos/{id}` (público, `image/jpeg`) |
 | Veterinários | `POST /veterinarios` (só ADMIN), `GET/PUT/DELETE /veterinarios/{id}`, `GET /veterinarios` |
 | Clínicas | `GET /clinicas`, `GET /clinicas/{id}`, `POST/PUT/DELETE /clinicas/{id}` (só ADMIN) |
 | Consultas | `POST /consultas`, `GET/PUT/DELETE /consultas/{id}`, `GET /consultas/pet/{petId}`, `GET /consultas` |
@@ -163,6 +182,39 @@ abaixo). Resumo dos grupos de rotas:
 `sort` como campos separados. Deixe `sort` **vazio** para usar a ordenação
 padrão, ou informe um campo real da entidade (ex: `dataHora,DESC`). Um campo
 inexistente (como o texto `string`) retorna **400** com mensagem explicativa.
+
+--------------------------------------------------------------------------------
+## 🖼️ FOTOS (ARMAZENADAS NO ORACLE)
+--------------------------------------------------------------------------------
+As fotos de tutores e pets ficam no próprio banco, na tabela `TB_FOTO`
+(coluna `CONTEUDO` do tipo `BLOB`, criada pela migration `V4`). Cada foto
+pertence a um tutor **ou** a um pet, e ao excluir o cadastro a foto é
+removida junto. Não é necessário nenhum serviço externo de armazenamento.
+
+**Como enviar:** nas mesmas rotas `POST/PUT /tutores` e `POST/PUT /pets`,
+use `multipart/form-data` com dois campos:
+* `dados`: texto com o JSON do cadastro (o mesmo corpo da versão JSON);
+* `foto`: o arquivo da imagem.
+
+As rotas com `Content-Type: application/json` continuam funcionando
+normalmente, sem foto.
+
+**O que a API faz com a imagem:** confere o conteúdo real do arquivo (aceita
+JPEG ou PNG de até 5 MB e 12 megapixels), reduz para no máximo 1024 px no
+maior lado e regrava como JPEG, descartando metadados (como localização do
+EXIF). Cadastro e foto são gravados na **mesma transação**: se algo falhar,
+nenhum dos dois é salvo.
+
+**Como ler:** o campo `fotoUrl` do tutor/pet passa a conter o endereço
+público da própria API, por exemplo
+`https://clyvopawsjavachallenge.onrender.com/fotos/<uuid>`. Ele já vem no
+login, em `GET /tutores/{id}`, `GET /pets/{id}` e `GET /pets/tutor/{id}`; o
+app só precisa usar a URL como fonte da imagem. Os bytes da imagem nunca
+vêm nas listagens.
+
+**Erros:** 400 (foto ausente ou dados inválidos), 413 (acima de 5 MB ou 12
+megapixels), 415 (arquivo que não é JPEG/PNG válido), 429 (muitas fotos sendo
+processadas ao mesmo tempo) e 404 (foto inexistente).
 
 --------------------------------------------------------------------------------
 ## 🤖 INTEGRAÇÃO COM IA (ANÁLISE DE FOTO DO PET)
@@ -220,9 +272,13 @@ serviço de IA devolver outra coisa, a API responde 502.
   tomada porque, na aplicação mobile, a localização é solicitada ao tutor
   diretamente pelo app (com a permissão do usuário).
 * Ao alterar o e-mail de um tutor, o `username` de login (`tb_user`) é
-  sincronizado automaticamente — mas o token JWT já emitido continua válido
-  com o e-mail **antigo** como identidade até expirar. Depois de trocar o
-  e-mail, é necessário fazer login novamente para obter um token atualizado.
+  sincronizado automaticamente. Como a sessão confere o usuário a cada
+  requisição, o token emitido com o e-mail **antigo** deixa de ser aceito
+  (401): depois de trocar o e-mail, é necessário fazer login novamente. O
+  mesmo vale para troca de senha: ela encerra as sessões existentes.
+* Fotos são sempre regravadas como JPEG (até 1024 px) e a URL pública da foto
+  usa um identificador aleatório: quem tem o link consegue ver a imagem, mas
+  não há como listar fotos. Uma nova foto substitui a anterior.
 * O **ADMIN** não possui um registro de perfil próprio (não é tutor nem
   veterinário), então no `POST /login` ele recebe `id` e `fotoUrl` nulos e o
   `username` no lugar do `nomeCompleto`. Não existe endpoint dedicado para
@@ -256,6 +312,11 @@ painel do Render (aba **Environment**):
 | `IA_BASE_URL` | URL do serviço de IA (Python), ex: `https://clyvopaws-ia.onrender.com` |
 | `IA_SERVICE_API_KEY` | chave interna Java → serviço de IA (mínimo 32 caracteres; deve ser a mesma configurada no serviço Python) |
 | `JAVA_TOOL_OPTIONS` | `-Xmx384m` (limita a memória da JVM no plano gratuito) |
+| `PUBLIC_API_BASE_URL` | *(opcional)* endereço público da API usado para montar o `fotoUrl`; o padrão já é `https://clyvopawsjavachallenge.onrender.com` |
+| `auth.access-token-seconds` / `auth.refresh-token-days` | *(opcionais)* duração do JWT (60–3600 s, padrão 900) e do refresh token (1–30 dias, padrão 7) |
+
+As migrations (`V1` a `V5`) são aplicadas pelo Flyway automaticamente na
+subida da aplicação, inclusive em cada novo deploy.
 
 E, em **Secret Files**, dois arquivos com o conteúdo das chaves RSA de
 produção: `private_key.pem` e `public_key.pem` (montados em `/etc/secrets/`).
@@ -288,6 +349,9 @@ links `https` corretos atrás do proxy.
     * `DB_PASSWORD` — senha do Oracle
     * (opcional) `DB_URL` — URL JDBC; se omitida, usa a do Oracle da FIAP
       (`jdbc:oracle:thin:@oracle.fiap.com.br:1521:ORCL`)
+    * (opcional) `PUBLIC_API_BASE_URL` — endereço público usado nas URLs de
+      foto; por padrão aponta para a API publicada no Render. Para testar
+      fotos localmente, use `http://localhost:8080`.
     * (opcional) `IA_BASE_URL` e `IA_SERVICE_API_KEY` — só necessárias para
       usar `POST /api/ia/analisar-pet`. Sem elas o restante da API funciona
       normalmente e esse endpoint responde 503. Por padrão `IA_BASE_URL`
@@ -311,7 +375,7 @@ Sem isso, a aplicação falha ao subir (bean do `JwtDecoder`/`JwtEncoder` não
 consegue ser criado).
 
 ### Passo 3 — Subir a aplicação
-Os dados de teste (`V1`, `V2`, `V3`) já vêm com hashes de senha reais
+Os dados de teste (`V1` a `V3`) já vêm com hashes de senha reais
 prontos — não é preciso gerar nada além das chaves do Passo 2. Só rodar:
 ```
 mvn spring-boot:run
@@ -319,7 +383,7 @@ mvn spring-boot:run
 Ou execute a classe `ClyvovetApplication` direto pela IDE. O Flyway aplica
 as migrations automaticamente e o servidor sobe em `http://localhost:8080`.
 
-⚠️ Se em algum momento você editar uma migration do Flyway (`V1`/`V2`/`V3`)
+⚠️ Se em algum momento você editar uma migration do Flyway (`V1` a `V5`)
 depois que ela já foi aplicada num banco, a próxima subida quebra com erro
 de checksum ("Migration checksum mismatch"). Se isso acontecer, apague as
 tabelas e a `flyway_schema_history` do seu schema e suba de novo.
@@ -347,9 +411,17 @@ traz:
   "nomeCompleto": "Ana Souza",
   "fotoUrl": "https://...",
   "id": 3,
-  "role": "TUTOR"
+  "role": "TUTOR",
+  "refreshToken": "q3Zr...43 caracteres...",
+  "expiresIn": 900,
+  "refreshExpiresAt": 1763000000000
 }
 ```
+* `token`: JWT de acesso, válido por `expiresIn` segundos (15 minutos).
+* `refreshToken`: token opaco para obter um novo JWT sem pedir a senha. Fica
+  guardado no banco apenas como hash (SHA-256).
+* `refreshExpiresAt`: instante em que a sessão inteira expira (milissegundos
+  Unix, 7 dias após o login). A renovação **não** prolonga esse prazo.
 * `role`: perfil do usuário (`TUTOR`, `VETERINARIO` ou `ADMIN`) — o app usa
   para decidir quais telas mostrar.
 * `nomeCompleto`, `fotoUrl` e `id`: dados do **perfil** do usuário. O `id` é
@@ -359,7 +431,23 @@ traz:
 * **ADMIN** não tem perfil próprio: recebe `id` e `fotoUrl` nulos e o
   `username` no lugar do `nomeCompleto`.
 
-O token expira em 30 minutos; credenciais inválidas retornam **401**.
+Credenciais inválidas retornam **401**.
+
+### Renovação e encerramento da sessão
+* `POST /auth/refresh` com `{"refreshToken": "..."}` devolve a mesma resposta
+  do login, com um novo `token` **e um novo `refreshToken`**. O app deve
+  guardar o novo valor: cada refresh token só pode ser usado uma vez
+  (rotação).
+* Se um refresh token já usado for apresentado de novo (indício de cópia ou
+  roubo), a sessão inteira é revogada e é preciso fazer login novamente.
+* `POST /auth/logout` com `{"refreshToken": "..."}` encerra a sessão (resposta
+  `204`, sempre, mesmo para token desconhecido). O JWT dessa sessão deixa de
+  ser aceito imediatamente, mesmo antes de expirar.
+* Sessões e tokens ficam nas tabelas `TB_AUTH_SESSION` e `TB_REFRESH_TOKEN`
+  (migration `V5`); sessões expiradas são removidas por uma rotina diária.
+* Recomendação para o app: ao receber **401** em uma rota protegida, chamar
+  `POST /auth/refresh` uma vez, repetir a requisição original e, se o refresh
+  também falhar com 401, levar o usuário para a tela de login.
 
 O token vai no header `Authorization: Bearer <token>` em toda rota protegida.
 
