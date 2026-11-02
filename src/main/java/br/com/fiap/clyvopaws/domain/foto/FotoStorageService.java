@@ -18,7 +18,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
-import java.sql.Types;
 import java.util.UUID;
 import java.util.concurrent.Semaphore;
 
@@ -29,6 +28,21 @@ public class FotoStorageService {
     private final JdbcTemplate jdbc;
     private final String baseUrl;
     private final Semaphore conversoes = new Semaphore(2);
+
+    /** Donos possíveis da foto. Tabela e coluna vêm só destas constantes, nunca do cliente. */
+    private enum Dono {
+        TUTOR("tb_tutor", "tutor_id"),
+        PET("tb_pet", "pet_id"),
+        VETERINARIO("tb_veterinario", "veterinario_id");
+
+        final String tabela;
+        final String coluna;
+
+        Dono(String tabela, String coluna) {
+            this.tabela = tabela;
+            this.coluna = coluna;
+        }
+    }
 
     public FotoStorageService(JdbcTemplate jdbc,
                               @Value("${PUBLIC_API_BASE_URL:https://clyvopawsjavachallenge.onrender.com}") String baseUrl) {
@@ -43,10 +57,11 @@ public class FotoStorageService {
         this.baseUrl = valor;
     }
 
-    public String salvarTutor(MultipartFile foto, Long id) { return salvar(foto, id, true); }
-    public String salvarPet(MultipartFile foto, Long id) { return salvar(foto, id, false); }
+    public String salvarTutor(MultipartFile foto, Long id) { return salvar(foto, id, Dono.TUTOR); }
+    public String salvarPet(MultipartFile foto, Long id) { return salvar(foto, id, Dono.PET); }
+    public String salvarVeterinario(MultipartFile foto, Long id) { return salvar(foto, id, Dono.VETERINARIO); }
 
-    private String salvar(MultipartFile foto, Long donoId, boolean tutor) {
+    private String salvar(MultipartFile foto, Long donoId, Dono dono) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("A foto e o cadastro devem usar a mesma transação.");
         }
@@ -59,25 +74,18 @@ public class FotoStorageService {
         try { jpeg = prepararJpeg(foto); }
         finally { conversoes.release(); }
 
-        // Esses nomes vêm somente de constantes do servidor, nunca de parâmetros do cliente.
-        String tabela = tutor ? "tb_tutor" : "tb_pet";
-        String coluna = tutor ? "tutor_id" : "pet_id";
         try {
             // Serializa substituições concorrentes da foto do mesmo cadastro.
-            jdbc.queryForObject("SELECT id FROM " + tabela + " WHERE id = ? FOR UPDATE", Long.class, donoId);
+            jdbc.queryForObject("SELECT id FROM " + dono.tabela + " WHERE id = ? FOR UPDATE", Long.class, donoId);
         } catch (EmptyResultDataAccessException e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Cadastro não encontrado.");
         }
         String id = UUID.randomUUID().toString();
-        jdbc.update("DELETE FROM tb_foto WHERE " + coluna + " = ?", donoId);
-        jdbc.update("INSERT INTO tb_foto (id, conteudo, tutor_id, pet_id) VALUES (?, ?, ?, ?)", ps -> {
+        jdbc.update("DELETE FROM tb_foto WHERE " + dono.coluna + " = ?", donoId);
+        jdbc.update("INSERT INTO tb_foto (id, conteudo, " + dono.coluna + ") VALUES (?, ?, ?)", ps -> {
             ps.setString(1, id);
             ps.setBlob(2, new ByteArrayInputStream(jpeg), jpeg.length);
-            if (tutor) {
-                ps.setLong(3, donoId); ps.setNull(4, Types.NUMERIC);
-            } else {
-                ps.setNull(3, Types.NUMERIC); ps.setLong(4, donoId);
-            }
+            ps.setLong(3, donoId);
         });
         return baseUrl + "/fotos/" + id;
     }

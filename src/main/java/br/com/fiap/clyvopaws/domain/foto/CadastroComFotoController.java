@@ -5,6 +5,8 @@ import br.com.fiap.clyvopaws.domain.pet.PetResponseDTO;
 import br.com.fiap.clyvopaws.domain.tutor.TutorRequestDTO;
 import br.com.fiap.clyvopaws.domain.tutor.TutorResponseDTO;
 import br.com.fiap.clyvopaws.domain.tutor.TutorUpdateDTO;
+import br.com.fiap.clyvopaws.domain.veterinario.VeterinarioRequestDTO;
+import br.com.fiap.clyvopaws.domain.veterinario.VeterinarioResponseDTO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,9 +21,10 @@ import org.springframework.web.server.ResponseStatusException;
 import java.net.URI;
 import java.util.stream.Collectors;
 
+/** As mesmas URLs aceitam JSON (controllers antigos) ou multipart com dados + foto. */
 @RestController
 @RequiredArgsConstructor
-@Tag(name = "Cadastros com foto", description = "Cadastro e atualização de tutores e pets com foto")
+@Tag(name = "Cadastros com foto", description = "Cadastro e atualização de tutores, pets e veterinários com foto (multipart/form-data: campo 'dados' com o JSON e campo 'foto' com a imagem JPEG/PNG de até 5 MB)")
 public class CadastroComFotoController {
     private final CadastroComFotoService service;
     private final ObjectMapper mapper;
@@ -51,6 +54,19 @@ public class CadastroComFotoController {
     public PetResponseDTO atualizarPet(@PathVariable("id") Long id,
                                        @RequestParam("dados") String dados, @RequestPart("foto") MultipartFile foto) {
         return service.atualizarPet(id, lerDados(dados, PetRequestDTO.class), foto);
+    }
+
+    @PostMapping(value = "/veterinarios", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<VeterinarioResponseDTO> cadastrarVeterinario(
+            @RequestParam("dados") String dados, @RequestPart("foto") MultipartFile foto) {
+        var resposta = service.cadastrarVeterinario(lerDados(dados, VeterinarioRequestDTO.class), foto);
+        return ResponseEntity.created(URI.create("/veterinarios/" + resposta.id())).body(resposta);
+    }
+
+    @PutMapping(value = "/veterinarios/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public VeterinarioResponseDTO atualizarVeterinario(@PathVariable("id") Long id,
+                                                       @RequestParam("dados") String dados, @RequestPart("foto") MultipartFile foto) {
+        return service.atualizarVeterinario(id, lerDados(dados, VeterinarioRequestDTO.class), foto);
     }
 
     private <T> T lerDados(String json, Class<T> tipo) {

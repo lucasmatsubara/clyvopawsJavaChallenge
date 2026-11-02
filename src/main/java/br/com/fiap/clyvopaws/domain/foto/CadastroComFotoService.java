@@ -3,6 +3,7 @@ package br.com.fiap.clyvopaws.domain.foto;
 import br.com.fiap.clyvopaws.auth.AuthorizationService;
 import br.com.fiap.clyvopaws.domain.pet.*;
 import br.com.fiap.clyvopaws.domain.tutor.*;
+import br.com.fiap.clyvopaws.domain.veterinario.*;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -14,8 +15,10 @@ import org.springframework.web.multipart.MultipartFile;
 public class CadastroComFotoService {
     private final TutorService tutorService;
     private final PetService petService;
+    private final VeterinarioService veterinarioService;
     private final TutorRepository tutorRepository;
     private final PetRepository petRepository;
+    private final VeterinarioRepository veterinarioRepository;
     private final AuthorizationService authorizationService;
     private final FotoStorageService fotoStorage;
 
@@ -60,8 +63,32 @@ public class CadastroComFotoService {
         return resposta;
     }
 
+    @Transactional
+    public VeterinarioResponseDTO cadastrarVeterinario(VeterinarioRequestDTO dados, MultipartFile foto) {
+        // Somente ADMIN chega aqui (regra de /veterinarios no SecurityConfig).
+        var resposta = veterinarioService.cadastrar(comUrl(dados, null));
+        var vet = veterinarioRepository.findById(resposta.id()).orElseThrow();
+        vet.setFotoUrl(fotoStorage.salvarVeterinario(foto, vet.getId()));
+        return new VeterinarioResponseDTO(vet);
+    }
+
+    @Transactional
+    public VeterinarioResponseDTO atualizarVeterinario(Long id, VeterinarioRequestDTO dados, MultipartFile foto) {
+        authorizationService.assertSelfVeterinario(id);
+        if (!veterinarioRepository.existsById(id)) {
+            throw new EntityNotFoundException("Veterinário não encontrado.");
+        }
+        String url = fotoStorage.salvarVeterinario(foto, id);
+        return veterinarioService.atualizar(id, comUrl(dados, url));
+    }
+
     private PetRequestDTO comUrl(PetRequestDTO d, String url) {
         return new PetRequestDTO(d.nome(), d.especie(), d.raca(), d.peso(), d.sexo(),
                 d.dataNascimento(), d.descricao(), url, d.tutorId());
+    }
+
+    private VeterinarioRequestDTO comUrl(VeterinarioRequestDTO d, String url) {
+        return new VeterinarioRequestDTO(d.nomeCompleto(), d.email(), d.telefone(), url,
+                d.crmv(), d.clinicaId(), d.username(), d.password());
     }
 }
