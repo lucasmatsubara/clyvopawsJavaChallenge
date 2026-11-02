@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequiredArgsConstructor
-@Tag(name = "Cadastros com foto")
+@Tag(name = "Cadastros com foto", description = "Cadastro e atualização de tutores e pets com foto")
 public class CadastroComFotoController {
     private final CadastroComFotoService service;
     private final ObjectMapper mapper;

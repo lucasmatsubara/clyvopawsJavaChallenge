@@ -1,5 +1,6 @@
 package br.com.fiap.clyvopaws.domain.foto;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
+@Tag(name = "Fotos", description = "Leitura pública das fotos de tutores e pets armazenadas no banco")
 public class LeituraFotoController {
     private final FotoStorageService fotoStorage;
 
