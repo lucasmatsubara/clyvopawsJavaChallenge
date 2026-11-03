@@ -76,7 +76,10 @@ public class PetService {
         pet.setSexo(request.sexo());
         pet.setDataNascimento(request.dataNascimento());
         pet.setDescricao(request.descricao());
-        pet.setFotoUrl(request.fotoUrl());
+        // Só altera a foto quando uma URL for enviada; um PUT sem fotoUrl mantém a atual.
+        if (request.fotoUrl() != null) {
+            pet.setFotoUrl(request.fotoUrl());
+        }
 
         return toResponseDTO(petRepository.save(pet));
     }

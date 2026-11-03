@@ -66,7 +66,10 @@ public class VeterinarioService {
         vet.setNomeCompleto(dto.nomeCompleto());
         vet.setEmail(dto.email());
         vet.setTelefone(dto.telefone());
-        vet.setFotoUrl(dto.fotoUrl());
+        // Só altera a foto quando uma URL for enviada; um PUT sem fotoUrl mantém a atual.
+        if (dto.fotoUrl() != null) {
+            vet.setFotoUrl(dto.fotoUrl());
+        }
         vet.setCrmv(dto.crmv());
         vet.setClinica(clinica);
 
