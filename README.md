@@ -41,6 +41,16 @@ rota fora do Swagger e do login exige token). Use o link do Swagger acima.
 * Pamella Christiny Chaves Brito   | RM: 565206
 
 --------------------------------------------------------------------------------
+## 🤝 DIVISÃO DE TAREFAS
+--------------------------------------------------------------------------------
+| Integrante | Responsabilidades |
+|---|---|
+| Felipe Ribeiro Salles de Camargo | _preencher_ |
+| João Pedro Pereira Camilo | _preencher_ |
+| Lucas Matsubara Reis | _preencher_ |
+| Pamella Christiny Chaves Brito | _preencher_ |
+
+--------------------------------------------------------------------------------
 ## 🧱 STACK TÉCNICA
 --------------------------------------------------------------------------------
 * **Linguagem**: Java 21
@@ -79,9 +89,10 @@ no escopo do Challenge:
    chaves RSA não são versionadas (`.gitignore`).
 
 ### Flyway (controle de versão do banco)
-5. Migrations versionadas (`V1` a `V5`): criação da estrutura, carga inicial
+5. Migrations versionadas (`V1` a `V6`): criação da estrutura, carga inicial
    de dados de teste, seed do usuário administrativo (`V1`–`V3`), tabela de
-   fotos em BLOB (`V4`) e tabelas de sessão/refresh token (`V5`). Migrations
+   fotos em BLOB (`V4`), tabelas de sessão/refresh token (`V5`) e foto de
+   veterinário (`V6`). Migrations
    já aplicadas nunca são editadas; toda mudança de banco entra em uma nova
    versão.
 
@@ -100,8 +111,8 @@ no escopo do Challenge:
    espécie, raça provável e nível de confiança para o tutor **confirmar**
    (ver seção "Integração com IA" abaixo).
 
-9. Fotos de tutores e pets armazenadas no próprio Oracle (`BLOB`): o cadastro
-   e a atualização aceitam `multipart/form-data` com os dados e a foto, e a
+9. Fotos de tutores, pets e veterinários armazenadas no próprio Oracle (`BLOB`): o cadastro
+   e a atualização (`/tutores`, `/pets` e `/veterinarios`) são feitos em `multipart/form-data` com os dados e uma foto **opcional**, e a
    imagem é servida por `GET /fotos/{id}` (ver seção "Fotos" abaixo).
 10. Sessão com refresh token: o JWT de acesso é curto (15 minutos) e a renovação
     é feita por `POST /auth/refresh`, com rotação do token e revogação da
@@ -150,7 +161,7 @@ dos Services de domínio:
 | Veterinario (perfil)            | Cadastro: só ADMIN. Listagem/detalhe: qualquer autenticado. Editar/excluir: só o próprio vet ou ADMIN |
 | Clinica / CatalogoPreventivo    | Leitura: qualquer autenticado. Escrita (POST/PUT/DELETE): só ADMIN |
 | Análise de foto por IA          | Somente TUTOR e ADMIN (`@PreAuthorize`) |
-| Foto de tutor / pet (upload)    | Mesmas regras do cadastro: só o próprio tutor altera a foto dele e dos próprios pets |
+| Foto de tutor / pet / veterinário (upload) | Mesmas regras do cadastro: só o próprio tutor altera a foto dele e dos próprios pets; foto de veterinário: cadastro só ADMIN, atualização só o próprio vet ou ADMIN |
 | Leitura da foto (`GET /fotos/{id}`) | Pública: o identificador é um UUID aleatório e não existe listagem de fotos |
 
 Sem token ou com credenciais inválidas a API responde **401**; tentativas
@@ -166,10 +177,10 @@ abaixo). Resumo dos grupos de rotas:
 | Grupo | Endpoints principais |
 |---|---|
 | Autenticação | `POST /login`, `POST /auth/refresh`, `POST /auth/logout` (todas públicas) |
-| Tutores | `POST /tutores` (público), `GET/PUT/DELETE /tutores/{id}`, `GET /tutores` — `POST` e `PUT` aceitam JSON **ou** multipart com foto |
-| Pets | `POST /pets`, `GET/PUT/DELETE /pets/{id}`, `GET /pets/tutor/{tutorId}`, `GET /pets` — `POST` e `PUT` aceitam JSON **ou** multipart com foto |
+| Tutores | `POST /tutores` (público), `GET/PUT/DELETE /tutores/{id}`, `GET /tutores` — `POST` e `PUT` em `multipart/form-data` (campo `dados` + `foto` opcional) |
+| Pets | `POST /pets`, `GET/PUT/DELETE /pets/{id}`, `GET /pets/tutor/{tutorId}`, `GET /pets` — `POST` e `PUT` em `multipart/form-data` (campo `dados` + `foto` opcional) |
 | Fotos | `GET /fotos/{id}` (público, `image/jpeg`) |
-| Veterinários | `POST /veterinarios` (só ADMIN), `GET/PUT/DELETE /veterinarios/{id}`, `GET /veterinarios` |
+| Veterinários | `POST /veterinarios` (só ADMIN), `GET/PUT/DELETE /veterinarios/{id}`, `GET /veterinarios` — `POST` e `PUT` em `multipart/form-data` (campo `dados` + `foto` opcional) |
 | Clínicas | `GET /clinicas`, `GET /clinicas/{id}`, `POST/PUT/DELETE /clinicas/{id}` (só ADMIN) |
 | Consultas | `POST /consultas`, `GET/PUT/DELETE /consultas/{id}`, `GET /consultas/pet/{petId}`, `GET /consultas` |
 | Medicamentos | `POST /medicamentos`, `GET/PUT/DELETE /medicamentos/{id}`, `GET /medicamentos/consulta/{consultaId}`, `POST /medicamentos/doses/check`, `GET /medicamentos` |
@@ -187,17 +198,19 @@ inexistente (como o texto `string`) retorna **400** com mensagem explicativa.
 ## 🖼️ FOTOS (ARMAZENADAS NO ORACLE)
 --------------------------------------------------------------------------------
 As fotos de tutores e pets ficam no próprio banco, na tabela `TB_FOTO`
-(coluna `CONTEUDO` do tipo `BLOB`, criada pela migration `V4`). Cada foto
-pertence a um tutor **ou** a um pet, e ao excluir o cadastro a foto é
+(coluna `CONTEUDO` do tipo `BLOB`, criada pela migration `V4` e estendida
+pela `V6`). Cada foto pertence a **exatamente um** dono (tutor, pet **ou**
+veterinário, garantido por uma constraint do banco), e ao excluir o cadastro a foto é
 removida junto. Não é necessário nenhum serviço externo de armazenamento.
 
-**Como enviar:** nas mesmas rotas `POST/PUT /tutores` e `POST/PUT /pets`,
-use `multipart/form-data` com dois campos:
-* `dados`: texto com o JSON do cadastro (o mesmo corpo da versão JSON);
-* `foto`: o arquivo da imagem.
+**Como enviar:** as rotas `POST/PUT /tutores`, `POST/PUT /pets` e
+`POST/PUT /veterinarios` usam sempre `multipart/form-data`, com dois campos:
+* `dados` (obrigatório): texto com o JSON do cadastro;
+* `foto` (**opcional**): o arquivo da imagem.
 
-As rotas com `Content-Type: application/json` continuam funcionando
-normalmente, sem foto.
+Sem o campo `foto`, o cadastro é feito normalmente, sem imagem. Em uma
+atualização sem `foto`, a foto atual é mantida. Existe uma única rota por
+operação: não há versão separada em JSON.
 
 **O que a API faz com a imagem:** confere o conteúdo real do arquivo (aceita
 JPEG ou PNG de até 5 MB e 12 megapixels), reduz para no máximo 1024 px no
@@ -208,11 +221,11 @@ nenhum dos dois é salvo.
 **Como ler:** o campo `fotoUrl` do tutor/pet passa a conter o endereço
 público da própria API, por exemplo
 `https://clyvopawsjavachallenge.onrender.com/fotos/<uuid>`. Ele já vem no
-login, em `GET /tutores/{id}`, `GET /pets/{id}` e `GET /pets/tutor/{id}`; o
+login, em `GET /tutores/{id}`, `GET /pets/{id}` e `GET /pets/tutor/{id}` e `GET /veterinarios`; o
 app só precisa usar a URL como fonte da imagem. Os bytes da imagem nunca
 vêm nas listagens.
 
-**Erros:** 400 (foto ausente ou dados inválidos), 413 (acima de 5 MB ou 12
+**Erros:** 400 (dados inválidos), 413 (acima de 5 MB ou 12
 megapixels), 415 (arquivo que não é JPEG/PNG válido), 429 (muitas fotos sendo
 processadas ao mesmo tempo) e 404 (foto inexistente).
 
@@ -278,7 +291,8 @@ serviço de IA devolver outra coisa, a API responde 502.
   mesmo vale para troca de senha: ela encerra as sessões existentes.
 * Fotos são sempre regravadas como JPEG (até 1024 px) e a URL pública da foto
   usa um identificador aleatório: quem tem o link consegue ver a imagem, mas
-  não há como listar fotos. Uma nova foto substitui a anterior.
+  não há como listar fotos. Uma nova foto substitui a anterior. Atualizar tutor, pet ou veterinário
+  sem enviar a foto mantém a foto atual.
 * O **ADMIN** não possui um registro de perfil próprio (não é tutor nem
   veterinário), então no `POST /login` ele recebe `id` e `fotoUrl` nulos e o
   `username` no lugar do `nomeCompleto`. Não existe endpoint dedicado para
@@ -315,7 +329,7 @@ painel do Render (aba **Environment**):
 | `PUBLIC_API_BASE_URL` | *(opcional)* endereço público da API usado para montar o `fotoUrl`; o padrão já é `https://clyvopawsjavachallenge.onrender.com` |
 | `auth.access-token-seconds` / `auth.refresh-token-days` | *(opcionais)* duração do JWT (60–3600 s, padrão 900) e do refresh token (1–30 dias, padrão 7) |
 
-As migrations (`V1` a `V5`) são aplicadas pelo Flyway automaticamente na
+As migrations (`V1` a `V6`) são aplicadas pelo Flyway automaticamente na
 subida da aplicação, inclusive em cada novo deploy.
 
 E, em **Secret Files**, dois arquivos com o conteúdo das chaves RSA de
@@ -383,7 +397,7 @@ mvn spring-boot:run
 Ou execute a classe `ClyvovetApplication` direto pela IDE. O Flyway aplica
 as migrations automaticamente e o servidor sobe em `http://localhost:8080`.
 
-⚠️ Se em algum momento você editar uma migration do Flyway (`V1` a `V5`)
+⚠️ Se em algum momento você editar uma migration do Flyway (`V1` a `V6`)
 depois que ela já foi aplicada num banco, a próxima subida quebra com erro
 de checksum ("Migration checksum mismatch"). Se isso acontecer, apague as
 tabelas e a `flyway_schema_history` do seu schema e suba de novo.
