@@ -41,16 +41,6 @@ rota fora do Swagger e do login exige token). Use o link do Swagger acima.
 * Pamella Christiny Chaves Brito   | RM: 565206
 
 --------------------------------------------------------------------------------
-## 🤝 DIVISÃO DE TAREFAS
---------------------------------------------------------------------------------
-| Integrante | Responsabilidades |
-|---|---|
-| Felipe Ribeiro Salles de Camargo | _preencher_ |
-| João Pedro Pereira Camilo | _preencher_ |
-| Lucas Matsubara Reis | _preencher_ |
-| Pamella Christiny Chaves Brito | _preencher_ |
-
---------------------------------------------------------------------------------
 ## 🧱 STACK TÉCNICA
 --------------------------------------------------------------------------------
 * **Linguagem**: Java 21
