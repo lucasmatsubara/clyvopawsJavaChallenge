@@ -30,7 +30,7 @@ rota fora do Swagger e do login exige token). Use o link do Swagger acima.
 --------------------------------------------------------------------------------
 ## 🎥 VÍDEO DE APRESENTAÇÃO
 --------------------------------------------------------------------------------
-* **Link do vídeo (até 15 minutos):** _COLE_O_LINK_AQUI_
+* **Link do vídeo (até 15 minutos):** https://youtu.be/LO9K8Agzug8
 
 --------------------------------------------------------------------------------
 ## 👥 INTEGRANTES DO GRUPO (Turma: 2TDSPX)
